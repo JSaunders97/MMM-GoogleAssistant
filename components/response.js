@@ -4,19 +4,16 @@ class AssistantResponse {
   constructor (responseConfig, callbacks) {
     this.config = responseConfig
     this.callbacks = callbacks
-    this.newChime = responseConfig.newChime
     this.showing = false
     this.response = null
     this.aliveTimer = null
-    this.allStatus = [ "hook", "standby", "reply", "error", "think", "continue", "listen", "confirmation" ]
+    this.allStatus = [ "standby", "reply", "error", "think", "continue", "listen", "confirmation" ]
     this.myStatus = { "actual" : "standby" , "old" : "standby" }
     this.loopCount = 0
     this.chime = {
-      beep: this.newChime ? "beep.mp3" : "Old/beep.mp3",
-      error: this.newChime ? "error.mp3" : "Old/error.mp3",
-      continue: this.newChime ? "continue.mp3" : "Old/continue.mp3",
-      open: "Google_beep_open.mp3",
-      close: "Google_beep_close.mp3",
+      beep: "beep.mp3",
+      error: "error.mp3",
+      continue: "continue.mp3",
     },
 
     this.audioResponse = new Audio()
@@ -47,10 +44,6 @@ class AssistantResponse {
     }
   }
 
-  doCommand (commandName, param, from) {
-    // do nothing currently.
-  }
-
   playChime (sound, external) {
     if (this.config.useChime) {
       this.audioChime.src = "modules/MMM-GoogleAssistant/resources/" + (external ? sound : this.chime[sound])
@@ -62,13 +55,13 @@ class AssistantResponse {
     var Status = document.getElementById("GA_STATUS")
     if (beep && this.myStatus.old != "continue") this.playChime("beep")
     if (status == "error" || status == "continue" ) this.playChime(status)
-    if (status == "WAVEFILE" || status == "TEXT") this.myStatus.actual = "think"
+    if (status == "TEXT") this.myStatus.actual = "think"
     if (status == "MIC") this.myStatus.actual = (this.myStatus.old == "continue") ? "continue" : "listen"
     if (this.myStatus.actual == this.myStatus.old) return
     this.callbacks.myStatus(this.myStatus) // send status external
     this.callbacks.sendNotification("ASSISTANT_" + this.myStatus.actual.toUpperCase())
     log("Status from " + this.myStatus.old + " to " + this.myStatus.actual)
-    Status.className = (this.myStatus.old == "hook") ? "hook" : this.myStatus.actual
+    Status.className = this.myStatus.actual
     this.myStatus.old = this.myStatus.actual
   }
 
@@ -142,10 +135,6 @@ class AssistantResponse {
         log("Continuous Conversation")
         this.callbacks.assistantActivate({
           type: "MIC",
-          profile: response.lastQuery.profile,
-          key: null,
-          lang: response.lastQuery.lang,
-          useScreenOutput: response.lastQuery.useScreenOutput,
           force: true
         }, Date.now())
 
@@ -175,29 +164,11 @@ class AssistantResponse {
     if (this.showing) {
       this.end()
     }
-
     if (response.error) {
-      if (response.error == "TRANSCRIPTION_FAILS") {
-        log("Transcription Failed. Re-try with text")
-        this.callbacks.assistantActivate({
-          type: "TEXT",
-          profile: response.lastQuery.profile,
-          key: response.transcription.transcription,
-          lang: response.lastQuery.lang,
-          useScreenOutput: response.lastQuery.useScreenOutput,
-          force: true,
-          chime: false
-        }, null)
-        return
-      }
-      if (response.error == "NO_RESPONSE" && response.lastQuery.status == "continue" && this.loopCount < 3) {
+      if (response.error == "NO_RESPONSE" && this.myStatus.actual == "continue" && this.loopCount < 3) {
         this.status("continue")
         this.callbacks.assistantActivate({
           type: "MIC",
-          profile: response.lastQuery.profile,
-          key: null,
-          lang: response.lastQuery.lang,
-          useScreenOutput: response.lastQuery.useScreenOutput,
           force: true
         }, Date.now())
         this.loopCount += 1
@@ -211,7 +182,6 @@ class AssistantResponse {
 
     var normalResponse = (response) => {
       this.showing = true
-      this.callbacks.A2D(response)
       this.status("reply")
       var so = this.showScreenOutput(response)
       var ao = this.playAudioOutput(response)
@@ -222,14 +192,9 @@ class AssistantResponse {
         this.end()
       }
     }
-    this.postProcess(
-      response,
-      ()=>{
-        response.continue = false // Issue: force to be false
-        this.end()
-      }, // postProcess done
-      ()=>{ normalResponse(response) } // postProcess none
-    )
+
+    normalResponse(response)
+
   }
 
   stopResponse (callback = ()=>{}) {
@@ -241,10 +206,6 @@ class AssistantResponse {
     tr.innerHTML = ""
 
     callback()
-  }
-
-  postProcess (response, callback_done=()=>{}, callback_none=()=>{}) {
-    this.callbacks.postProcess(response, callback_done, callback_none)
   }
 
   playAudioOutput (response) {
@@ -279,15 +240,15 @@ class AssistantResponse {
     var GA = document.getElementById("GA")
     if (active) {
       GA.className= "in" + (this.fullscreenAbove ? " fullscreen_above": "")
-      MM.getModules().exceptWithClass("MMM-GoogleAssistant").enumerate((module)=> {
-        module.hide(500, {lockString: "GA_LOCKED"})
-      })
+      //MM.getModules().exceptWithClass("MMM-GoogleAssistant").enumerate((module)=> {
+      //  module.hide(500, {lockString: "GA_LOCKED"})
+      //})
     } else {
       if (status && status.actual == "standby") { // only on standby mode
         GA.className= "out" + (this.fullscreenAbove ? " fullscreen_above": "")
-        MM.getModules().exceptWithClass("MMM-GoogleAssistant").enumerate((module)=> {
-          module.show(500, {lockString: "GA_LOCKED"})
-        })
+        //MM.getModules().exceptWithClass("MMM-GoogleAssistant").enumerate((module)=> {
+        //  module.show(500, {lockString: "GA_LOCKED"})
+        //})
       }
     }
   }

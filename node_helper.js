@@ -7,7 +7,6 @@ const exec = require("child_process").exec
 const fs = require("fs")
 const Assistant = require("./components/assistant.js")
 const ScreenParser = require("./components/screenParser.js")
-const ActionManager = require("./components/actionManager.js")
 const Snowboy = require("@bugsounet/snowboy").Snowboy
 
 var _log = function() {
@@ -40,22 +39,6 @@ module.exports = NodeHelper.create({
       case "ASSISTANT_READY":
         this.snowboy.start()
         break
-      case "SHELLEXEC":
-        var command = payload.command
-        command += (payload.options) ? (" " + payload.options) : ""
-        exec (command, (e,so,se)=> {
-          log("ShellExec command:", command)
-          if (e) console.log("[ASSISTANT] ShellExec Error:" + e)
-          this.sendSocketNotification("SHELLEXEC_RESULT", {
-            executed: payload,
-            result: {
-              error: e,
-              stdOut: so,
-              stdErr: se,
-            }
-          })
-        })
-        break
     }
   },
 
@@ -80,12 +63,8 @@ module.exports = NodeHelper.create({
     var parser = new ScreenParser(parserConfig, this.config.debug)
     var result = null
     this.assistant.activate(payload, (response)=> {
-      response.lastQuery = payload
       if (!(response.screen || response.audio)) {
         response.error = "NO_RESPONSE"
-        if (response.transcription && response.transcription.transcription && !response.transcription.done) {
-          response.error = "TRANSCRIPTION_FAILS"
-        }
       }
       if (response.error == "TOO_SHORT" && response) response.error = null
       if (response.screen) {
@@ -122,48 +101,8 @@ module.exports = NodeHelper.create({
     this.snowboy = new Snowboy(this.config.snowboy, this.config.micConfig, (detected) => { this.hotwordDetect(detected) } , this.config.debug )
     this.snowboy.init()
 
-    this.loadRecipes(()=> this.sendSocketNotification("INITIALIZED"))
-    if (this.config.A2DServer.useA2D) console.log ("[ASSISTANT] Assistant2Display Server Started")
     console.log ("[ASSISTANT] Google Assistant is initialized.")
-  },
-
-  loadRecipes: function(callback=()=>{}) {
-    if (this.config.recipes) {
-      let replacer = (key, value) => {
-        if (typeof value == "function") {
-          return "__FUNC__" + value.toString()
-        }
-        return value
-      }
-      var recipes = this.config.recipes
-      var actions = []
-      var error = null
-      for (var i = 0; i < recipes.length; i++) {
-        try {
-          var p = require("./recipes/" + recipes[i]).recipe
-          this.sendSocketNotification("LOAD_RECIPE", JSON.stringify(p, replacer, 2))
-          if (p.actions) actions = Object.assign({}, actions, p.actions)
-          console.log("[ASSISTANT] RECIPE_LOADED:", recipes[i])
-        } catch (e) {
-          console.log(`[ASSISTANT] RECIPE_ERROR (${recipes[i]}):`, e.message, e)
-          error = `[ASSISTANT] RECIPE_ERROR (${recipes[i]})`
-          return this.sendSocketNotification("NOT_INITIALIZED", error)
-        }
-      }
-      if (actions && Object.keys(actions).length > 0) {
-        var actionConfig = Object.assign({}, this.config.customActionConfig)
-        actionConfig.actions = Object.assign({}, actions)
-        actionConfig.projectId = this.config.assistantConfig.projectId
-        var Manager = new ActionManager(actionConfig, this.config.debug)
-        Manager.makeAction(callback())
-      } else {
-        log("NO_ACTION_TO_MANAGE")
-        callback()
-      }
-    } else {
-      log("NO_RECIPE_TO_LOAD")
-      callback()
-    }
+    this.sendSocketNotification("INITIALIZED")
   },
 
   /** Snowboy Callback **/
