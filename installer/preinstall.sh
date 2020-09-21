@@ -3,6 +3,15 @@
 # | npm preinstall |
 # +----------------+
 
+<<<<<<< HEAD
+=======
+# with or without prompt ?
+prompt=true
+if [ -e no-prompt ]; then
+  prompt=false
+fi
+
+>>>>>>> my-branch
 # get the installer directory
 Installer_get_current_dir () {
   SOURCE="${BASH_SOURCE[0]}"
@@ -24,6 +33,7 @@ source utils.sh
 # module name
 Installer_module="MMM-GoogleAssistant"
 
+<<<<<<< HEAD
 echo
 
 # Let's start !
@@ -100,3 +110,27 @@ git pull 2>/dev/null
 
 echo
 Installer_info "Installing all npm libraries..."
+=======
+# check version
+Installer_version="$(cat ../package.json | grep version | cut -c14-30 2>/dev/null)"
+
+# Let's start !
+if $prompt; then
+  Installer_info "Welcome to $Installer_module $Installer_version"
+  echo
+fi
+
+# delete package-lock.json (force)
+rm -f ../package-lock.json
+
+# Check not run as root
+if [ "$EUID" -eq 0 ]; then
+  Installer_error "npm install must not be used as root"
+  exit 1
+fi
+
+if $prompt; then
+  echo
+  Installer_info "Installing all npm libraries..."
+fi
+>>>>>>> my-branch
